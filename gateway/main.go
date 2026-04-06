@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -19,11 +20,12 @@ func main() {
 var (
 	addr       = flag.String("addr", ":7777", "listen address")
 	solverAddr = flag.String("solver-addr", "http://localhost:8080", "solver address")
-	dbURI      = flag.String("db", "mipaas.db", "database file")
+	dbURI      = flag.String("db", "optimsation.db", "database file")
+
+	adminAccountsFlag = flag.String("admin-accounts", "admin", "a comma separated list of account names that can access the admin API")
 )
 
 func Main() int {
-
 	flag.Parse()
 
 	logger := newLogger(LogFormatPretty, slog.LevelDebug)
@@ -70,7 +72,9 @@ func Main() int {
 
 		var handler http.Handler = protected
 
-		handler = allowedAccounts([]string{"mipaas"}, handler)
+		adminAccounts := strings.Split(*adminAccountsFlag, ",")
+
+		handler = allowedAccounts(adminAccounts, handler)
 		handler = loggingMiddleware(logger, handler)
 		handler = apiKeyMiddleware(db, logger, handler)
 		handler = requestIDMiddleware(handler)
@@ -97,7 +101,6 @@ func Main() int {
 	}
 
 	return 0
-
 }
 
 func checkUsage(db *sql.DB, logger *slog.Logger) http.HandlerFunc {
