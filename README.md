@@ -106,4 +106,7 @@ set -l optimisation_api_key "urn:optimisation:api_key:xxxyyyzzz"
 
 # Send a request file to generate an optimised plan.
 optimise data/req_body.json
+
+# To view the details of a request (only for admin accounts)
+request_details $request_id | jq
 ```

@@ -36,5 +36,13 @@ function optimise --argument request_file
 
     set -q _flag_host; or set _flag_host https://mipaas.boatshed.io
 
-    curl $_flag_host/api/v1-alpha/plan -i -d "$(cat $request_file)" -H "X-API-KEY: $optimisation_api_key"
+    curl -XPOST $_flag_host/api/v1-alpha/plan -i -d "$(cat $request_file)" -H "X-API-KEY: $optimisation_api_key"
+end
+
+function request_details --argument request_id
+    argparse 'h/host=' -- $argv; or return
+
+    set -q _flag_host; or set _flag_host https://mipaas.boatshed.io
+
+    curl $_flag_host/admin/request/$request_id -H "X-API-KEY: $optimisation_api_key"
 end
