@@ -140,3 +140,5 @@ We provide the following configuration for assets to optimise:
 And we get a nice plan for when to dispatch the BESS and EV.
 
 ![Dispatch Plan](assets/dispatch_plan.svg)
+
+Note the first BESS dispatch is to cover the morning load (which isn't visualised).
