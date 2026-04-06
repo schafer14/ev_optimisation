@@ -110,3 +110,33 @@ optimise data/req_body.json
 # To view the details of a request (only for admin accounts)
 request_details $request_id | jq
 ```
+
+## Running Pluto
+
+From the root directory run `julia` `activate mipaas` and `import Pluto; Pluto.run()`.
+
+### Example with pictures
+
+This example uses simulated predictions with confidence intervals that
+will help for future work to create best/worst case optimisations, for now
+it is safe to ignore the confidence intervals.
+
+We simulate some price and solar predictions for a day we want to optimise:
+
+![Weather Predictions](assets/weather_predictions.svg)
+
+![Price Predictions](assets/price_predictions.svg)
+
+We provide the following configuration for assets to optimise:
+
+```json
+{
+  "evs": [{"capacity_kwh":56,"max_charge_kw":7.0,"soc":0.14}],
+  "pv": {"capacity_kw":6.6},
+  "bess": [{"capacity_kwh":41.0,"max_charge_kw":11.0,"max_discharge_kw":10.0,"efficiency":0.9,"soc":0.51}]
+}
+```
+
+And we get a nice plan for when to dispatch the BESS and EV.
+
+![Dispatch Plan](assets/dispatch_plan.svg)
