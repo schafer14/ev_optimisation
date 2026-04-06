@@ -73,7 +73,7 @@ begin
 	plot!(t, forecast_high, fillrange=forecast_low, fillalpha=0.15,fillcolor=:purple, label="95% CI", linewidth=0, color=:purple)
 	xlabel!("Minutes from midnight")
 	ylabel!("\$/MWh")
-	title!("NSW1 Spot Price — 2026-03-11")
+	title!("NSW1 Spot Price")
 end
 
 # ╔═╡ 6ae9eccc-ba8c-4d30-8c7f-c8d67b329a2d
@@ -126,8 +126,11 @@ begin
 	plot!(t, solar_high, fillrange=solar_low, fillalpha=0.15,fillcolor=:purple, label="95% CI", linewidth=0, color=:purple)
 	xlabel!("Minutes from midnight")
 	ylabel!("Solar Efficency")
-	title!("Solar Efficency — 2026-03-11")
+	title!("Solar Efficency")
 end
+
+# ╔═╡ f6ae4817-6c12-468f-b145-85cf31e516d7
+
 
 # ╔═╡ 4ab4e54c-81ea-43a6-89d3-47cae6eea6be
 md"""
@@ -1680,6 +1683,7 @@ version = "1.13.0+0"
 # ╠═a18f7ce2-138b-49d9-b015-748d1bd94657
 # ╠═ccd79e96-e395-429e-8d3f-7f8d93e86885
 # ╠═b7f27a23-bff6-4a04-80d7-15262c9b5e7f
+# ╠═f6ae4817-6c12-468f-b145-85cf31e516d7
 # ╟─4ab4e54c-81ea-43a6-89d3-47cae6eea6be
 # ╠═b5363151-2066-4489-a887-5b3114edfb8d
 # ╟─1b22106c-b9ae-4236-9a21-70364429595e
