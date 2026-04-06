@@ -311,7 +311,7 @@ end
 begin
 	plot(t, pv.capacity_kw .* solar_efficency, label="PV Output (kW)", color=:orange)
 	plot!(t, household_load, label="Household Load (kW)", color=:red)
-	plot!(t, value.(bess_charge), label="BESS Charge (kW)", color=:green)
+	plot!(t, value.(bess_plan), label="BESS Charge (kW)", color=:green)
 	plot!(t, value.(ev_charge_plan), label="EV Charge (kW)", color=:blue)
 	ylabel!("kW")
 	title!("Generation vs Consumption")
