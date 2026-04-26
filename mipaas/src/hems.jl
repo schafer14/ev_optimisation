@@ -1,9 +1,9 @@
 module HemsModel
 
     using JuMP
-    import JSON
     import HTTP
     import HiGHS
+    import JSON3
 
     export EVObject, PVObject, BESSObject, HEMSObject, solve_hems, SoCAt, CycleCost, PriceObject, EVSoCAt, EVCycleCost, EVRampPenalty
 
@@ -20,6 +20,18 @@ module HemsModel
 
     struct EVRampPenalty <: EVConstraint
         cost::Float64 
+    end
+
+    struct DriveTime <: EVConstraint
+        start_interval::Int 
+        end_interval::Int 
+        soc_drain::Float64
+    end
+
+    function apply!(model, i, c::DriveTime)
+        for t in c.start_interval:c.end_interval
+            fix(model[:ev_charge_plan][i, t], 0.0; force=true)
+        end
     end
 
     function apply!(model, i, c::EVSoCAt)
@@ -39,6 +51,14 @@ module HemsModel
       add_to_expression!(model[:ev_ramp_penalty][i], c.cost * sum(ramp))
     end
 
+    JSON3.StructType(::Type{<:EVConstraint}) = JSON3.AbstractType()
+    JSON3.subtypekey(::Type{EVConstraint}) = :type
+    JSON3.subtypes(::Type{EVConstraint}) = (SoCAt=EVSoCAt, CycleCost=EVCycleCost, RampPenalty=EVRampPenalty, DriveTime=DriveTime)
+    JSON3.StructType(::Type{EVSoCAt}) = JSON3.Struct()
+    JSON3.StructType(::Type{EVCycleCost}) = JSON3.Struct()
+    JSON3.StructType(::Type{EVRampPenalty}) = JSON3.Struct()
+    JSON3.StructType(::Type{DriveTime}) = JSON3.Struct()
+
     Base.@kwdef struct EVObject
         capacity_kwh::Float64
         max_charge_kw::Float64
@@ -46,9 +66,6 @@ module HemsModel
 
         min_soc::Float64 = 0.1
         max_soc::Float64 = 1.0
-
-        plug_in_t::Int = 1
-        plug_out_t::Int = 288
 
         constraints::Vector{EVConstraint} = EVConstraint[]
     end
@@ -68,6 +85,12 @@ module HemsModel
         cost_per_kwh::Float64 # $/kWh
     end
 
+    JSON3.StructType(::Type{<:BESSConstraint}) = JSON3.AbstractType()
+    JSON3.subtypekey(::Type{BESSConstraint}) = :type
+    JSON3.subtypes(::Type{BESSConstraint}) = (SoCAt=SoCAt, CycleCost=CycleCost)
+    JSON3.StructType(::Type{SoCAt}) = JSON3.Struct()
+    JSON3.StructType(::Type{CycleCost}) = JSON3.Struct()
+
     function apply!(model, i, c::SoCAt)
       @constraint(model, model[:bess_soc][i, c.at] >= c.soc)
     end
@@ -85,6 +108,8 @@ module HemsModel
 
         min_soc::Float64 = 0
         max_soc::Float64 = 1
+
+        unused_energy_value::Float64 = 0
 
         constraints::Vector{BESSConstraint} = BESSConstraint[]
     end
@@ -158,23 +183,49 @@ module HemsModel
         )
 
         # The SoC is dependant on the single SoC before it (instead of all other SoCs before it)
-        @constraint(model, [e=1:n_evs], ev_soc[e, 1] == data.evs[e].soc + ev_charge_plan[e, 1] * dt / data.evs[e].capacity_kwh)
-        @constraint(model, [e=1:n_evs, t=2:288], ev_soc[e, t] == ev_soc[e, t-1] + ev_charge_plan[e, t] * dt / data.evs[e].capacity_kwh)
+        # Before the SoC constraints, build a drain matrix
+        ev_drain = zeros(n_evs, 288)
+        for i in 1:n_evs
+            for c in data.evs[i].constraints
+                if c isa DriveTime
+                    n = c.end_interval - c.start_interval + 1
+                    for t in c.start_interval:c.end_interval
+                        ev_drain[i, t] = c.soc_drain / n
+                    end
+                end
+            end
+        end
+
+        # Modified SoC recurrence
+        @constraint(model, [e=1:n_evs], 
+            ev_soc[e, 1] == data.evs[e].soc + ev_charge_plan[e, 1] * dt / data.evs[e].capacity_kwh - ev_drain[e, 1])
+        @constraint(model, [e=1:n_evs, t=2:288], 
+            ev_soc[e, t] == ev_soc[e, t-1] + ev_charge_plan[e, t] * dt / data.evs[e].capacity_kwh - ev_drain[e, t])
 
         # The SoC is dependant on the single SoC before it (instead of all other SoCs before it)
         @constraint(model, [b=1:n_bess], bess_soc[b, 1] == data.bess[b].soc + bess_plan[b, 1] * data.bess[b].efficiency * dt / data.bess[b].capacity_kwh)
         @constraint(model, [b=1:n_bess, t=2:288], bess_soc[b, t] == bess_soc[b, t-1] + bess_plan[b, t] * data.bess[b].efficiency * dt / data.bess[b].capacity_kwh)
+
+        @expression(model, bess_unused_energy_value[b=1:n_bess],
+            data.bess[b].unused_energy_value * bess_soc[b, 288] * data.bess[b].capacity_kwh
+        )
 
         @objective(model, Max,
             sum(net_grid_value)
             - sum(bess_cycle_penalty)
             - sum(ev_cycle_penalty)
             - sum(ev_ramp_penalty)
+            + sum(bess_unused_energy_value)
         )
 
         optimize!(model)
-        assert_is_solved_and_feasible(model)
-        solution_summary(model)
+
+        if termination_status(model) != MOI.OPTIMAL
+          return Dict{String,Any}(
+            "status" => "infeasible",
+            "terminaton_status" => string(termination_status(model)),
+          )
+        end
 
         return Dict{String,Any}(
             "status" => "okay",
@@ -185,9 +236,15 @@ module HemsModel
                 "bess_plans" => [value.(bess_plan[b, :]) for b in 1:n_bess],
                 "bess_soc" => [value.(bess_soc[b, :]) for b in 1:n_bess],
                 "ev_soc" => [value.(ev_soc[e, :]) for e in 1:n_evs],
+                "ev_unavailable" => [
+                    [(start_interval=c.start_interval, end_interval=c.end_interval)
+                    for c in data.evs[e].constraints if c isa DriveTime]
+                    for e in 1:n_evs
+                ],
                 "bess_cycle_penalty" => value.(bess_cycle_penalty),
                 "ev_cycle_penalty" => value.(ev_cycle_penalty),
                 "ev_ramp_penalty" => value.(ev_ramp_penalty),
+                "grid_price" => sum(value.(net_grid_value)),
             )
         )
 

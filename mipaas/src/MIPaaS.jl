@@ -2,17 +2,35 @@ module MIPaaS
 
     import HTTP
     import JSON3
-    import JSON
 
     include("hems.jl")
 
+    const CORS_HEADERS = [
+        "Access-Control-Allow-Origin" => "*",
+        "Access-Control-Allow-Methods" => "POST, GET, OPTIONS",
+        "Access-Control-Allow-Headers" => "Content-Type",
+    ]
+
+    # Handle preflight OPTIONS request
+    function handle_cors(req)
+        if req.method == "OPTIONS"
+            return HTTP.Response(200, CORS_HEADERS)
+        end
+        return nothing
+    end
+
     function wrap_endpoint(endpoint::Function)
         function serve_request(request::HTTP.Request)::HTTP.Response
+            cors = handle_cors(request)
+            cors !== nothing && return cors
+
+
             task = Threads.@spawn try
-                ret = request.body |> String |> body -> JSON3.read(body, HemsModel.HEMSObject) |> endpoint |> JSON.json
-                HTTP.Response(200, ret)
+                ret = request.body |> String |> body -> JSON3.read(body, HemsModel.HEMSObject) |> endpoint |> JSON3.write
+                HTTP.Response(200, CORS_HEADERS, ret)
             catch err
-                HTTP.Response(500, "internal error: $err")
+                println(err)
+                HTTP.Response(500, CORS_HEADERS, "internal error: $err")
             end
             return fetch(task)
         end

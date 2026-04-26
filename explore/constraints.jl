@@ -15,6 +15,8 @@ begin
 	using DataFrames
 	using Plots
 	using Random
+	using JSON
+	using JSON3
 	
 	import HiGHS 
 	include("hems.jl") 
@@ -150,6 +152,8 @@ begin
 		solar_efficency, 
 		household_load,
 	)
+
+	println(stdout, JSON.json(problem))
 end
 
 # ╔═╡ 6836439f-a1bb-41bd-bd21-3fe190d9c89f
@@ -179,6 +183,47 @@ begin
 	title!("Generation vs Consumption")
 end
 
+# ╔═╡ 86cd0236-5538-4100-b273-a0d4d8bb3557
+begin
+	const json = """{
+	  "evs": [
+	    {
+	      "capacity_kwh": 60,
+	      "max_charge_kw": 7.0,
+	      "soc": 0.2,
+	      "min_soc": 0.1,
+	      "max_soc": 1.0,
+	      "plug_in_t": 1,
+	      "plug_out_t": 288,
+	      "constraints": []
+	    }
+	  ],
+	  "pv": {
+	    "capacity_kw": 10.0
+	  },
+	  "bess": [
+	    {
+	      "capacity_kwh": 13.5,
+	      "max_charge_kw": 5.0,
+	      "max_discharge_kw": 5.0,
+	      "efficiency": 0.9,
+	      "soc": 0.5,
+	      "min_soc": 0.1,
+	      "max_soc": 0.9,
+	      "constraints": []
+	    }
+	  ],
+	  "prices": {
+	    "import_price": [0.3, 0.3],
+	    "export_price": [0.05, 0.05]
+	  },
+	  "solar": [0.0, 0.0],
+	  "load": [0.4, 0.4]
+	}"""
+	
+	JSON3.read(json, HEMSObject)
+end
+
 # ╔═╡ Cell order:
 # ╟─52317868-3237-11f1-ba17-a701ff718d27
 # ╠═1fdf511a-7194-46f6-98f9-dd89e4f79149
@@ -190,3 +235,4 @@ end
 # ╟─6836439f-a1bb-41bd-bd21-3fe190d9c89f
 # ╠═3792192a-7fce-4896-bb7d-2f1bc45de2bd
 # ╠═e8ae43c7-c32e-412e-9a4f-e39c3690acef
+# ╠═86cd0236-5538-4100-b273-a0d4d8bb3557
