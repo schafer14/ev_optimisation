@@ -223,13 +223,13 @@ module HemsModel
         if termination_status(model) != MOI.OPTIMAL
           return Dict{String,Any}(
             "status" => "infeasible",
-            "terminaton_status" => string(termination_status(model)),
+            "termination_status" => string(termination_status(model)),
           )
         end
 
         return Dict{String,Any}(
             "status" => "okay",
-            "terminaton_status" => termination_status(model),
+            "termination_status" => termination_status(model),
             "primal_status" => primal_status(model),
             "data" => Dict{String,Any}(
                 "ev_plans" => [value.(ev_charge_plan[e, :]) for e in 1:n_evs],
