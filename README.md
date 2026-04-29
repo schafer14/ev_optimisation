@@ -144,3 +144,7 @@ And we get a nice plan for when to dispatch the BESS and EV.
 Note the first BESS dispatch is to cover the morning load (which isn't visualised).
 
 ![Generation Consumption](assets/consumption_generation.svg)
+
+## API Docs
+
+[API Docs](/api.md)
