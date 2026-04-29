@@ -1,5 +1,10 @@
 # Deploy
 
+This is how I deploy a demo for the interactive UI. Using this mechanism
+the solver takes about 30 seconds to load the first time will Julia JITs.
+For deployment with more reliable performance characteristics I use a VPN
+with Julia installed.
+
 ## Deploying Optimiser on Cloud Run
 
 ```bash
