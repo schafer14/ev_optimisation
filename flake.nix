@@ -10,7 +10,22 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
           pkgs = import nixpkgs { inherit system; };
+          julia = pkgs.julia-bin;
+
+          src = pkgs.lib.cleanSource ./.;
       in {
+
+        apps.dev-server = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "mipaas-server" ''
+            export JULIA_DEPOT_PATH="''${JULIA_DEPOT_PATH:-$HOME/.cache/mipaas-depot}"
+            mkdir -p "$JULIA_DEPOT_PATH"
+            ${julia}/bin/julia --project=${src}/server -e '
+              using Pkg; Pkg.instantiate(); Pkg.precompile()
+              include("${src}/server/src/Server.jl")
+            '
+          '');
+        };
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [ 
