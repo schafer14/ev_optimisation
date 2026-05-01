@@ -133,6 +133,10 @@ begin
     	export_price = prices ./ 1000,
 	)
 
+	network_constraints = [
+		PeakDemand(window_start=181, window_end=253,  cost_per_kw=0.3849, min_charge_demand_kw=0.0)
+	]
+
 	problem = HEMSObject(
 		[ev], 
 		pv, 
@@ -141,6 +145,8 @@ begin
 		price, 
 		solar_efficency, 
 		household_load,
+
+		network_constraints
 	)
 
 end
@@ -158,17 +164,18 @@ end
 
 # ╔═╡ e8ae43c7-c32e-412e-9a4f-e39c3690acef
 begin
-	p = plot(t, result["data"]["bess_soc"][1], label="BESS SoC", color=:red, linestyle=:dash)
+	p = plot(t, result["data"]["bess_soc"][1], label="BESS SoC", color=:red, linestyle=:dash, legend=:topleft)
 	plot!(t, result["data"]["ev_soc"][1], label="EV SoC", color=:blue, linestyle=:dash)
 
 	ylims!(0, 1)
 	ylabel!("SoC")
 
 	p2 = twinx(p)
-    plot!(p2, t, result["data"]["bess_plans"][1], label="BESS Plan", color=:red)
+	plot!(p2, t, result["data"]["bess_plans"][1], label="BESS Plan", color=:red, legend=:topright)
 	plot!(p2, t, result["data"]["ev_plans"][1], label="EV Plan", color=:blue)
 	ylabel!(p2, "Discharge (kW)")
 
+	vspan!(p2, [t[181], t[253]], alpha=0.1, color=:orange, label="Peak Window")
 	title!("Generation vs Consumption")
 end
 

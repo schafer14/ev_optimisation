@@ -4,7 +4,7 @@ module MIPaaS
     import HiGHS
     import JSON3
 
-    export EVObject, PVObject, BESSObject, HEMSObject, solve_hems, SoCAt, CycleCost, PriceObject, EVSoCAt, EVCycleCost, EVRampPenalty
+    export EVObject, PVObject, BESSObject, HEMSObject, solve_hems, SoCAt, CycleCost, PriceObject, EVSoCAt, EVCycleCost, EVRampPenalty, NetworkPriceConstraint, PeakDemand
 
     abstract type EVConstraint end
 
@@ -98,6 +98,24 @@ module MIPaaS
       add_to_expression!(model[:bess_cycle_penalty][i], c.cost_per_kwh * model[:bess_throughputs][i])
     end
 
+    abstract type NetworkPriceConstraint end
+
+    Base.@kwdef struct PeakDemand <: NetworkPriceConstraint
+        window_start::Int
+        window_end::Int
+        cost_per_kw::Float64
+        min_charge_demand_kw::Float64 = 0;
+    end
+
+    function apply!(model, c::PeakDemand)
+        model[:peak_demand] = @variable(model, lower_bound = c.min_charge_demand_kw, base_name = "peak_demand")
+        gi = model[:grid_import]
+        for t in c.window_start:6:c.window_end-5
+          @constraint(model, model[:peak_demand] >= sum(gi[t:t+5]) / 6)
+        end
+        add_to_expression!(model[:network_peak_demand_penalty], c.cost_per_kw * model[:peak_demand])
+    end
+
     Base.@kwdef struct BESSObject
         capacity_kwh::Float64       # usable energy capacity
         max_charge_kw::Float64      # max charge power
@@ -118,7 +136,7 @@ module MIPaaS
         export_price::Vector{Float64}   # $/kWh per timestep
     end
 
-    struct HEMSObject
+    Base.@kwdef struct HEMSObject
         evs::Vector{EVObject}
         pv::Union{PVObject, Nothing}
         bess::Vector{BESSObject}
@@ -126,6 +144,8 @@ module MIPaaS
         prices::PriceObject
         solar::Vector{Float64}
         load::Vector{Float64}
+
+        network_price_constraints::Vector{NetworkPriceConstraint} = NetworkPriceConstraint[]
     end
 
     function solve_hems(data::HEMSObject)
@@ -150,11 +170,17 @@ module MIPaaS
         @expression(model, bess_plan[b=1:n_bess, t=1:288], bess_charge[b, t] - bess_discharge[b, t])
         @expression(model, bess_throughputs[b=1:n_bess], sum(bess_charge[b, t] + bess_discharge[b, t] for t in 1:288) * dt)
 
+        @expression(model, network_peak_demand_penalty, AffExpr(0.0))
+
         @expression(model, bess_cycle_penalty[b=1:n_bess], AffExpr(0.0))
         @expression(model, ev_cycle_penalty[e=1:n_evs], AffExpr(0.0))
         @expression(model, ev_throughputs[e=1:n_evs], sum(ev_charge_plan[e, t] for t in 1:288) * dt)
 
         @expression(model, ev_ramp_penalty[1:n_evs], AffExpr(0.0))
+
+        for c in data.network_price_constraints 
+          apply!(model, c)
+        end
 
         for i in 1:n_bess 
           set_lower_bound.(bess_soc[i, :], data.bess[i].min_soc)
@@ -215,6 +241,7 @@ module MIPaaS
             - sum(ev_cycle_penalty)
             - sum(ev_ramp_penalty)
             + sum(bess_unused_energy_value)
+            - network_peak_demand_penalty
         )
 
         optimize!(model)
@@ -244,6 +271,8 @@ module MIPaaS
                 "ev_cycle_penalty" => value.(ev_cycle_penalty),
                 "ev_ramp_penalty" => value.(ev_ramp_penalty),
                 "grid_price" => sum(value.(net_grid_value)),
+                "peak_demand_rate" => value.(network_peak_demand_penalty),
+                "peak_demand_kw" => haskey(model, :peak_demand) ? value(model[:peak_demand]) : nothing,
             )
         )
 
