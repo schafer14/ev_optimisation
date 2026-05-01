@@ -113,7 +113,7 @@ request_details $request_id | jq
 
 ## Running Pluto
 
-From the root directory run `julia` `activate mipaas` and `import Pluto; Pluto.run()`.
+`julia --project=notebooks notebooks/start.jl`
 
 ### Example with pictures
 
