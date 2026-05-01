@@ -2,36 +2,35 @@
   description = "MIPaaS";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs }: 
-    let
-      # define system once
-      system = "x86_64-linux";
-      # use it here, and bind platform-specific packages to `pkgs`
-      pkgs = nixpkgs.legacyPackages.${system};
-    in {
+  outputs = { nixpkgs, flake-utils, ... }: 
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+          pkgs = import nixpkgs { inherit system; };
+      in {
 
-    devShells.x86_64-linux.default = pkgs.mkShell {
-      packages = with pkgs; [ 
-        julia-bin 
-        fish 
-      ];
+        devShells.default = pkgs.mkShell {
+          packages = with pkgs; [ 
+            julia-bin 
+            go
 
-      NIX_LD = "${pkgs.stdenv.cc.bintools.dynamicLinker}";
-      NIX_LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [
-        stdenv.cc.cc.lib
-        zlib
-        gcc-unwrapped.lib
-      ]);
+            fish 
+          ];
 
-      APPLICATION = "NEM Explore";
-      shellHook = ''
-        exec fish -N -C "source scripts.fish; init"
-      '';
+          NIX_LD = "${pkgs.stdenv.cc.bintools.dynamicLinker}";
+          NIX_LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [
+            stdenv.cc.cc.lib
+            zlib
+            gcc-unwrapped.lib
+          ]);
 
-    };
-  };
+          shellHook = ''
+            exec fish -N -C "source scripts.fish; init"
+          '';
 
+      };
+    });
 }
