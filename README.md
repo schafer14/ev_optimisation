@@ -111,9 +111,11 @@ optimise data/req_body.json
 request_details $request_id | jq
 ```
 
-## Running Pluto
+## Running the Development Environment
 
-`julia --project=notebooks notebooks/start.jl`
+The development environment is a custom REPL which includes shortcuts
+and help docs. It manages all project dependencies for you including
+Go and Julia. Start with `nix develop`.
 
 ### Example with pictures
 
